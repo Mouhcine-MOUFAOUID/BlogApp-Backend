@@ -1,19 +1,31 @@
 const User = require("../models/user.model");
 const bcrypt = require("bcrypt");
+const jwt = require('jsonwebtoken')
+const SALT = bcrypt.genSaltSync(10)
+const SECRET_KEY = process.env.SECRET_KEY
 
 // This function create Users
 async function createUser(req, res) {
+  const { email, name, password } = req.body;
   try {
+    const userExist = await User.findOne({ email: email });
+    if (userExist) {
+      res.status(400).json({ message: 'Email already exists' });
+      return;
+    }
     const user = new User({
-      email: req.body.email,
-      password: req.body.password,
-      name: req.body.name,
+      email,
+      name,
+      password: bcrypt.hashSync(password, SALT)
     });
     await user.save();
-    res.status(201).json({ message: 'User saved successfully!' });
+    res.status(201).json({ message: 'User registered successfully!' });
   } catch (error) {
-    res.status(400).json({ message: error.message });
-  }};
+    console.error('User creation error:', error);
+    res.status(500).json({ message: 'Failed to register user' });
+  }
+}
+
 
 
 
@@ -23,7 +35,7 @@ async function getAllUsers(req, res) {
     const users = await User.find();
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: "Internal Server Error"});
   }
 }
 
@@ -42,6 +54,7 @@ async function getUserById(req, res) {
     res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
 
 // This one update the user
 async function updateUser(req, res) {
@@ -85,5 +98,5 @@ module.exports = {
   getAllUsers,
   getUserById,
   updateUser,
-  deleteUser,
+  deleteUser
 };
