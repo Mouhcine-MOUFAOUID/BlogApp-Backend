@@ -1,33 +1,49 @@
 const User = require('../models/user.model');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const bcrypt = require("bcrypt");
+const SECRET_KEY = process.env.SECRET_KEY
 
 
-const generateToken = (email, _id, role) => {
-  const token = jwt.sign({ user : email, _id, role }, "mySecretCode200987**$", { expiresIn: "2h" });
-  return token;
-};
 
 dotenv.config();
 
+//Login function
 async function toAuthenticate(req, res) {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ message: "Email not exist" });
-    }
-    if (user.password !== password || user.email !== email) {
-      return res.status(401).json({ message: "Email or Password incorrect" });
-    }
-
-    const token = generateToken(user.email, user._id, user.role);
-    res.status(200).json({ token });
-  } catch (error) {
-    console.error('Authentication Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(400).json({ message: 'User not found' });
+  }
+  const passOk = bcrypt.compareSync(password, user.password);
+  if (passOk) {
+    // User logged in
+    jwt.sign({ name: user.name, id: user._id }, SECRET_KEY, {}, (err, token) => {
+      if (err) throw err;
+      res.cookie('token', token).json({
+        id: user._id,
+        name: user.name
+      });
+    });
+  } else {
+    res.status(400).json({ message: 'Email or password incorrect' });
   }
 }
 
-module.exports = { toAuthenticate };
+function profile(req, res){
+  try{
+    const {token} = req.cookies;
+  jwt.verify(token, SECRET_KEY, {}, (err, info)=>{
+    if(err) throw err;
+    res.json(info)
+  })
+  }catch(err){
+    res.status(500).json({ err })
+  }
+}
+
+function logout(req, res){
+  res.cookie('token', '').json('Loging out..')
+}
+
+module.exports = { toAuthenticate, profile, logout };
